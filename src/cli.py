@@ -4,6 +4,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='Multimodal End-to-End Sparse Model for Emotion Recognition')
 
     # Training hyper-parameters
+    # 训练的超参数
     parser.add_argument('-bs', '--batch-size', help='Batch size', type=int, required=True)
     parser.add_argument('-lr', '--learning-rate', help='Learning rate', type=float, required=True)
     parser.add_argument('-wd', '--weight-decay', help='Weight decay', type=float, required=False, default=0.0)
@@ -18,6 +19,7 @@ def get_args():
     parser.add_argument('--text-lr-factor', help='Factor the learning rate of text model', type=int, required=False, default=10)
 
     # Model
+    # 模型
     parser.add_argument('-mo', '--model', help='Which model', type=str, required=False, default='mme2e')
     parser.add_argument('--text-model-size', help='Size of the pre-trained text model', type=str, required=False, default='base')
     parser.add_argument('--fusion', help='How to fuse modalities', type=str, required=False, default='early')
@@ -30,21 +32,25 @@ def get_args():
     parser.add_argument('-aft', '--audio-feature-type', help='Hand crafted audio feature types', type=int, default=0)
 
     # Data
+    # 数据
     parser.add_argument('--num-emotions', help='Number of emotions in data', type=int, required=False, default=4)
     parser.add_argument('--img-interval', help='Interval to sample image frames', type=int, required=False, default=500)
     parser.add_argument('--hand-crafted', help='Use hand crafted features', action='store_true')
     parser.add_argument('--text-max-len', help='Max length of text after tokenization', type=int, required=False, default=300)
 
     # Path
-    parser.add_argument('--datapath', help='Path of data', type=str, required=False, default='./data')
+    # 路径 数据移到文件夹外后使用绝对路经 默认使用的数据集是iemocap 使用其他数据集的时候自己备注
+    parser.add_argument('--datapath', help='Path of data', type=str, required=False, default='/home/luocong/projects/data/data')
     parser.add_argument('--dataset', help='Use which dataset', type=str, required=False, default='iemocap')
 
     # Evaluation
+    # 评估 验证集 测试集
     parser.add_argument('-mod', '--modalities', help='what modalities to use', type=str, required=False, default='tav')
     parser.add_argument('--valid', help='Only run validation', action='store_true')
     parser.add_argument('--test', help='Only run test', action='store_true')
 
     # Checkpoint
+    # 检查点
     parser.add_argument('--ckpt', help='Path of checkpoint', type=str, required=False, default='')
     parser.add_argument('--ckpt-mod', help='Load which modality of the checkpoint', type=str, required=False, default='tav')
 
