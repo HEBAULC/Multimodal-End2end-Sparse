@@ -207,7 +207,7 @@ def get_dataset_mosei(data_folder: str, phase: str, img_interval: int, hand_craf
         img_interval=img_interval
     )
 
-#MOSEI数据集的基线模型
+#MOSEI数据集的基线模型 也就是使用人工特征进行训练
 class MOSEI_baseline(Dataset):
     def __init__(self, ids, hcf, labels: List[int]):
         super(MOSEI_baseline, self).__init__()

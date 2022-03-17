@@ -9,43 +9,69 @@ from src.models.vgg_block import VggBasicBlock
 
 
 class MME2E(nn.Module):
+	# 魔法函数
     def __init__(self, args, device):
         super(MME2E, self).__init__()
+        # 情感类别数量
         self.num_classes = args['num_emotions']
+        # 超参数
         self.args = args
         self.mod = args['modalities'].lower()
         self.device = device
+        # 特征维度
         self.feature_dim = args['feature_dim']
+        # 训练的层数
         nlayers = args['trans_nlayers']
+        # 训练的头数
         nheads = args['trans_nheads']
+        # 训练的维度
         trans_dim = args['trans_dim']
-
+		
+		# 以下都是进入transformer之前的准备工作 也就是模型自动提取特征的部分
+		
+		#文本嵌入维度
         text_cls_dim = 768
+        #文本模型的大小
         if args['text_model_size'] == 'large':
             text_cls_dim = 1024
         if args['text_model_size'] == 'xlarge':
             text_cls_dim = 2048
-
+		
+		# 文本模态调用MME2E_T函数
         self.T = MME2E_T(feature_dim=self.feature_dim, size=args['text_model_size'])
-
+		
+		# 视觉模态的预处理
+		# 调用MTCNN模块提取人脸 from facenet_pytorch import MTCNN
         self.mtcnn = MTCNN(image_size=48, margin=2, post_process=False, device=device)
+        # 归一化
         self.normalize = transforms.Normalize(mean=[159, 111, 102], std=[37, 33, 32])
-
+		
+		# 处理视觉模态的特征
         self.V = nn.Sequential(
+        	# 2d卷积提取特征
             nn.Conv2d(in_channels=3, out_channels=64, kernel_size=5, padding=2),
+            # 批量归一化
             nn.BatchNorm2d(64),
+            # ReLU激活 近似
             nn.ReLU(),
+            # 最大池化 汇聚特征
             nn.MaxPool2d(kernel_size=2, stride=2),
+            # 调用3次VGG基本模块
             VggBasicBlock(in_planes=64, out_planes=64),
             VggBasicBlock(in_planes=64, out_planes=64),
             VggBasicBlock(in_planes=64, out_planes=128),
+            # 最大池化 汇聚提取的特征
             nn.MaxPool2d(kernel_size=2, stride=2),
+            # 调用一次VGG基本模块 运用最大池化
             VggBasicBlock(in_planes=128, out_planes=256),
             nn.MaxPool2d(kernel_size=2, stride=2),
+            # 调用一次VGG基本模块 运用最大池化
             VggBasicBlock(in_planes=256, out_planes=512),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
-
+		
+		# 音频模态的模型
+		# 和对图像处理的模型一摸一样，对MFCC频率图像进行特征提取
         self.A = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=64, kernel_size=5, padding=2),
             nn.BatchNorm2d(64),
@@ -60,19 +86,22 @@ class MME2E(nn.Module):
             VggBasicBlock(in_planes=256, out_planes=512),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
-
+		
+		# 对视觉模态特征进行线性变换+非线性变换 变换到transformer的输入维度
         self.v_flatten = nn.Sequential(
             nn.Linear(512 * 3 * 3, 1024),
             nn.ReLU(),
             nn.Linear(1024, trans_dim)
         )
 
+		# 对音频模态特征进行线性变换+非线性变换 变换到transformer的输入维度
         self.a_flatten = nn.Sequential(
             nn.Linear(512 * 8 * 2, 1024),
             nn.ReLU(),
             nn.Linear(1024, trans_dim)
         )
-
+		
+		# 将变换后视频和音频特征送入transformer	
         self.v_transformer = WrappedTransformerEncoder(dim=trans_dim, num_layers=nlayers, num_heads=nheads)
         self.a_transformer = WrappedTransformerEncoder(dim=trans_dim, num_layers=nlayers, num_heads=nheads)
 
@@ -82,6 +111,7 @@ class MME2E(nn.Module):
 
         self.weighted_fusion = nn.Linear(len(self.mod), 1, bias=False)
 
+	# 前向传播
     def forward(self, imgs, imgs_lens, specs, spec_lens, text):
         all_logits = []
 
@@ -117,13 +147,19 @@ class MME2E(nn.Module):
             return all_logits[0]
 
         return self.weighted_fusion(torch.stack(all_logits, dim=-1)).squeeze(-1)
-
+	
+	# 图像中心裁剪 
     def crop_img_center(self, img: torch.tensor, target_size=48):
         '''
         Some images have un-detectable faces,
         to make the training goes normally,
         for those images, we crop the center part,
         which highly likely contains the face or part of the face.
+        
+        有些图像有无法检测到的人脸，
+		为了让训练正常进行，
+		对于这些图像，我们裁剪中心部分，
+		很可能包含面部或部分面部。
 
         @img - (channel, height, width)
         '''
