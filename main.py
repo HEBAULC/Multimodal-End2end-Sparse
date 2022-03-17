@@ -163,7 +163,7 @@ if __name__ == "__main__":
     if args['dataset'] == 'iemocap' or 'mosei':
         trainer = IemocapTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
 
-    # 分支模块6
+    # 分支模块6:处理训练方式
     if args['test']:
         trainer.test()
     elif args['valid']:
