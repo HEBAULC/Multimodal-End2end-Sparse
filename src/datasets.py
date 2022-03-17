@@ -20,48 +20,162 @@ def getEmotionDict() -> Dict[str, int]:
     #生气：0，激动：1，沮丧：2，开心：3，中性：4，伤心：5  6种情感
     return {'ang': 0, 'exc': 1, 'fru': 2, 'hap': 3, 'neu': 4, 'sad': 5}
 
-#获取iemocap数据集
-def get_dataset_iemocap(data_folder: str, phase: str, img_interval: int, hand_crafted_features: Optional[bool] = False):
-    main_folder = os.path.join(data_folder, 'IEMOCAP_RAW_PROCESSED')
-    meta = load(os.path.join(main_folder, 'meta.pkl'))
+# 默认是给iemocap数据集使用的
+def collate_fn(batch):
+    utterance_ids = []
+    texts = []
+    labels = []
 
-    emoDict = getEmotionDict()
-    uttr_ids = open(os.path.join(data_folder, 'IEMOCAP_SPLIT', f'{phase}_split.txt'), 'r').read().splitlines()
-    texts = [meta[uttr_id]['text'] for uttr_id in uttr_ids]
-    labels = [emoDict[meta[uttr_id]['label']] for uttr_id in uttr_ids]
+    newSampledImgs = None
+    imgSeqLens = []
 
-    # 手工特征
-    if hand_crafted_features:
-        text_features = load(os.path.join(data_folder, 'IEMOCAP_HCF_FEATURES', f'{phase}_text_features.pt'))
-        audio_features = load(os.path.join(data_folder, 'IEMOCAP_HCF_FEATURES', f'{phase}_audio_features.pt'))
-        video_features = load(os.path.join(data_folder, 'IEMOCAP_HCF_FEATURES', f'{phase}_video_features.pt'))
+    specgrams = []
+    specgramSeqLens = []
 
-        # Select only the FAUs
-        for uttrId in video_features.keys():
-            for imgId in video_features[uttrId].keys():
-                video_features[uttrId][imgId] = video_features[uttrId][imgId][-35:]
+    for dp in batch:
+        utteranceId, sampledImgs, specgram, text, label = dp
+        if sampledImgs.shape[0] == 0:
+            continue
+        utterance_ids.append(utteranceId)
+        texts.append(text)
+        labels.append(label)
 
-        this_dataset = IEMOCAP_baseline(
-            utterance_ids=uttr_ids,
-            texts=text_features,
-            video_features=video_features,
-            audio_features=audio_features,
-            labels=labels,
-            label_annotations=list(emoDict.keys()),
-            img_interval=img_interval
+        imgSeqLens.append(sampledImgs.shape[0])
+        newSampledImgs = sampledImgs if newSampledImgs is None else np.concatenate((newSampledImgs, sampledImgs),
+                                                                                   axis=0)
+
+        specgramSeqLens.append(len(specgram))
+        specgrams.append(torch.cat(specgram, dim=0))
+
+    imgs = newSampledImgs
+
+    return (
+        utterance_ids,
+        imgs,
+        imgSeqLens,
+        torch.cat(specgrams, dim=0),
+        specgramSeqLens,
+        texts,
+        torch.tensor(labels, dtype=torch.float32)
+    )
+
+# 人工特征数据加载器
+class HCFDataLoader(DataLoader):
+    FEATURE_TYPE_ALL = 0
+    FEATURE_TYPE_NO_BBE = 1
+    FEATURE_TYPE_NO_MFCC = 2
+    FEATURE_TYPE_NO_PHONOLOGICAL = 3
+    FEATURE_TYPE_MEAN_STD_ALL = 4
+    FEATURE_TYPE_NO_MIN_MAX_ALL = 5
+    FEATURE_TYPE_PLUS = 6
+
+    # 特征类型字典
+    FEATURE_TYPE_DICT = {
+        # 所有提取的音频特征 BBE+MFCC+phonological=142维+100，101两维
+        FEATURE_TYPE_ALL: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+                           26, 27, 28, 29, 30, 31, 32, 33, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666,
+                           667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684,
+                           685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702,
+                           703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716, 717, 718, 719, 720,
+                           721, 722, 723, 724, 725, 726, 727, 728, 729, 730, 731, 732, 733, 734, 735, 736, 737, 738,
+                           739, 740, 741, 742, 743, 744, 745, 746, 747, 748, 749, 750, 751, 752, 753, 754, 755, 756,
+                           757, 758, 759, 760, 761, 762, 100, 101],
+        # 除了BBE的音频特征，BBE有22维 下标0-21
+        FEATURE_TYPE_NO_BBE: [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 655, 656, 657, 658, 659, 660, 661, 662,
+                              663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680,
+                              681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698,
+                              699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716,
+                              717, 718, 719, 720, 721, 722, 723, 724, 725, 726, 727, 728, 729, 730, 731, 732, 733, 734,
+                              735, 736, 737, 738, 739, 740, 741, 742, 743, 744, 745, 746, 747, 748, 749, 750, 751, 752,
+                              753, 754, 755, 756, 757, 758, 759, 760, 761, 762],
+        # 除了MFCC的音频特征，MFCC有12维 下标从22-33
+        FEATURE_TYPE_NO_MFCC: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 655, 656,
+                               657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674,
+                               675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692,
+                               693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710,
+                               711, 712, 713, 714, 715, 716, 717, 718, 719, 720, 721, 722, 723, 724, 725, 726, 727, 728,
+                               729, 730, 731, 732, 733, 734, 735, 736, 737, 738, 739, 740, 741, 742, 743, 744, 745, 746,
+                               747, 748, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759, 760, 761, 762],
+        # 除了18种音韵类别18 phonological classes 108个统计特征 下标从655-762
+        FEATURE_TYPE_NO_PHONOLOGICAL: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                                       23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
+
+        FEATURE_TYPE_MEAN_STD_ALL: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                                    23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 655, 656, 661, 662, 667, 668, 673, 674,
+                                    679, 680, 685, 686, 691, 692, 697, 698, 703, 704, 709, 710, 715, 716, 721, 722, 727,
+                                    728, 733, 734, 739, 740, 745, 746, 751, 752, 757, 758],
+        FEATURE_TYPE_NO_MIN_MAX_ALL: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                                      23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 655, 656, 657, 658, 661, 662, 663,
+                                      664, 667, 668, 669, 670, 673, 674, 675, 676, 679, 680, 681, 682, 685, 686, 687,
+                                      688, 691, 692, 693, 694, 697, 698, 699, 700, 703, 704, 705, 706, 709, 710, 711,
+                                      712, 715, 716, 717, 718, 721, 722, 723, 724, 727, 728, 729, 730, 733, 734, 735,
+                                      736, 739, 740, 741, 742, 745, 746, 747, 748, 751, 752, 753, 754, 757, 758, 759,
+                                      760],
+        FEATURE_TYPE_PLUS: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+                            25, 26, 27, 28, 29, 30, 31, 32, 33, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71,
+                            72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94,
+                            95, 96, 97, 98, 99, 100, 101, 102, 103, 116, 117, 118, 119, 120, 121, 180, 181, 182, 183,
+                            184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201,
+                            202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 238, 239, 240, 241, 242, 243,
+                            360, 361, 362, 363, 364, 365, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434, 435,
+                            436, 437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452, 453,
+                            454, 455, 456, 457, 482, 483, 484, 485, 486, 487, 552, 553, 554, 555, 556, 557, 558, 559,
+                            562, 563, 564, 565, 568, 569, 570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581,
+                            655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672,
+                            673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690,
+                            691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708,
+                            709, 710, 711, 712, 713, 714, 715, 716, 717, 718, 719, 720, 721, 722, 723, 724, 725, 726,
+                            727, 728, 729, 730, 731, 732, 733, 734, 735, 736, 737, 738, 739, 740, 741, 742, 743, 744,
+                            745, 746, 747, 748, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759, 760, 761, 762]
+    }
+
+    def __init__(self, feature_type=0, *args, **kwargs):
+        super(HCFDataLoader, self).__init__(*args, **kwargs)
+        self.audio_feature_indices = self.FEATURE_TYPE_DICT[feature_type]
+        self.collate_fn = self.collate_fn_hcf
+
+    def collate_fn_hcf(self, batch):
+        uttrIds = []
+        texts = []
+        labels = []
+        video_features = []
+        video_lens = []
+        audio_features = []
+        audio_lens = []
+        for dp in batch:
+            uttrId, video_feature, audio_feature, word_indices, label = dp
+            uttrIds.append(uttrId)
+            texts.append(word_indices)
+            labels.append(label)
+            video_features.append(torch.tensor(video_feature))
+
+            audio_features.append(torch.tensor(audio_feature).t())
+            video_lens.append(len(video_feature))
+            audio_lens.append(audio_feature.shape[1])
+
+        text_max_len = get_max_len(texts)
+        for i in range(len(texts)):
+            if len(texts[i]) == 0:
+                texts[i] = torch.zeros(text_max_len, 300, dtype=torch.float32)
+            else:
+                texts[i] = padTensor(torch.tensor(texts[i], dtype=torch.float32), text_max_len)
+
+        video_features = torch.cat(video_features, dim=0)
+        audio_features = torch.cat(audio_features, dim=0)
+
+        audio_features = audio_features[:, self.audio_feature_indices]
+
+        return (
+            uttrIds,
+            video_features.float(),
+            video_lens,
+            audio_features.float(),
+            audio_lens,
+            torch.stack(texts),
+            torch.tensor(labels, dtype=torch.float32)
         )
-    else:
-        this_dataset = IEMOCAP(
-            main_folder=main_folder,
-            utterance_ids=uttr_ids,
-            texts=texts,
-            labels=labels,
-            label_annotations=list(emoDict.keys()),
-            img_interval=img_interval
-        )
 
-    return this_dataset
-
+# MOSEI相关
 #获取mosei数据集的方法 （获取训练集、验证集、测试集三者其中一个 phase参数决定）
 def get_dataset_mosei(data_folder: str, phase: str, img_interval: int, hand_crafted_features: Optional[bool] = False):
     # 主文件夹
@@ -160,7 +274,7 @@ def collate_fn_hcf_mosei(batch):
         torch.tensor(labels, dtype=torch.float32)
     )
 
-#MOSEI类
+#MOSEI数据集类
 class MOSEI(Dataset):
     def __init__(self, main_folder: str, ids: List[str], texts: List[List[int]], labels: List[int], img_interval: int):
         super(MOSEI, self).__init__()
@@ -173,7 +287,7 @@ class MOSEI(Dataset):
 
     #获得注释
     def get_annotations(self) -> List[str]:
-	#生气、沮丧、害怕、开心、伤心、惊讶六种情感
+	    #生气、沮丧、害怕、开心、伤心、惊讶六种情感
         return ['anger', 'disgust', 'fear', 'happy', 'sad', 'surprise']
 
     #获得正面的比例
@@ -242,6 +356,49 @@ class MOSEI(Dataset):
         specgrams = self.cutSpecToPieces(specgram)
 
         return this_id, sampledImgs, specgrams, self.texts[ind], self.labels[ind]
+
+# IEMOCAP相关
+#获取iemocap数据集
+def get_dataset_iemocap(data_folder: str, phase: str, img_interval: int, hand_crafted_features: Optional[bool] = False):
+    main_folder = os.path.join(data_folder, 'IEMOCAP_RAW_PROCESSED')
+    meta = load(os.path.join(main_folder, 'meta.pkl'))
+
+    emoDict = getEmotionDict()
+    uttr_ids = open(os.path.join(data_folder, 'IEMOCAP_SPLIT', f'{phase}_split.txt'), 'r').read().splitlines()
+    texts = [meta[uttr_id]['text'] for uttr_id in uttr_ids]
+    labels = [emoDict[meta[uttr_id]['label']] for uttr_id in uttr_ids]
+
+    # 手工特征
+    if hand_crafted_features:
+        text_features = load(os.path.join(data_folder, 'IEMOCAP_HCF_FEATURES', f'{phase}_text_features.pt'))
+        audio_features = load(os.path.join(data_folder, 'IEMOCAP_HCF_FEATURES', f'{phase}_audio_features.pt'))
+        video_features = load(os.path.join(data_folder, 'IEMOCAP_HCF_FEATURES', f'{phase}_video_features.pt'))
+
+        # Select only the FAUs
+        for uttrId in video_features.keys():
+            for imgId in video_features[uttrId].keys():
+                video_features[uttrId][imgId] = video_features[uttrId][imgId][-35:]
+
+        this_dataset = IEMOCAP_baseline(
+            utterance_ids=uttr_ids,
+            texts=text_features,
+            video_features=video_features,
+            audio_features=audio_features,
+            labels=labels,
+            label_annotations=list(emoDict.keys()),
+            img_interval=img_interval
+        )
+    else:
+        this_dataset = IEMOCAP(
+            main_folder=main_folder,
+            utterance_ids=uttr_ids,
+            texts=texts,
+            labels=labels,
+            label_annotations=list(emoDict.keys()),
+            img_interval=img_interval
+        )
+
+    return this_dataset
 
 #IEMOCAP数据集类
 class IEMOCAP(Dataset):
@@ -333,52 +490,17 @@ class IEMOCAP(Dataset):
 
         waveform, sr = torchaudio.load(os.path.join(uttrFolder, f'audio_{audio_suffix}.wav'))
 
-        # Cut WAV
+        # Cut WAV 将声波切片
         # waveformPieces = self.cutWavToPieces(waveform, sr)
         # specgrams = [torchaudio.transforms.MelSpectrogram()(waveformPiece).unsqueeze(0) for waveformPiece in waveformPieces]
 
-        # Cut Spec
+        # Cut Spec 频谱图切片
+        # 梅尔频谱图 https://zhuanlan.zhihu.com/p/198900624?utm_source=wechat_session
+        # 参考文章 https://vimsky.com/examples/usage/python-torchaudio.transforms.TimeStretch-pt.html
         specgram = torchaudio.transforms.MelSpectrogram(sample_rate=sr, win_length=int(float(sr) / 16000 * 400))(waveform).unsqueeze(0)
         specgrams = self.cutSpecToPieces(specgram)
 
         return uttrId, sampledImgs, specgrams, self.texts[ind], self.labels[ind]
-
-def collate_fn(batch):
-    utterance_ids = []
-    texts = []
-    labels = []
-
-    newSampledImgs = None
-    imgSeqLens = []
-
-    specgrams = []
-    specgramSeqLens = []
-
-    for dp in batch:
-        utteranceId, sampledImgs, specgram, text, label = dp
-        if sampledImgs.shape[0] == 0:
-            continue
-        utterance_ids.append(utteranceId)
-        texts.append(text)
-        labels.append(label)
-
-        imgSeqLens.append(sampledImgs.shape[0])
-        newSampledImgs = sampledImgs if newSampledImgs is None else np.concatenate((newSampledImgs, sampledImgs), axis=0)
-
-        specgramSeqLens.append(len(specgram))
-        specgrams.append(torch.cat(specgram, dim=0))
-
-    imgs = newSampledImgs
-
-    return (
-        utterance_ids,
-        imgs,
-        imgSeqLens,
-        torch.cat(specgrams, dim=0),
-        specgramSeqLens,
-        texts,
-        torch.tensor(labels, dtype=torch.float32)
-    )
 
 #IEMOCAP基线模型
 class IEMOCAP_baseline(Dataset):
@@ -436,74 +558,4 @@ class IEMOCAP_baseline(Dataset):
 
         return uttrId, video_feature, audio_feature, text, label
 
-#人工特征数据加载器
-class HCFDataLoader(DataLoader):
-    FEATURE_TYPE_ALL = 0
-    FEATURE_TYPE_NO_BBE = 1
-    FEATURE_TYPE_NO_MFCC = 2
-    FEATURE_TYPE_NO_PHONOLOGICAL = 3
-    FEATURE_TYPE_MEAN_STD_ALL = 4
-    FEATURE_TYPE_NO_MIN_MAX_ALL = 5
-    FEATURE_TYPE_PLUS = 6
-    
-#特征类型字典
-    FEATURE_TYPE_DICT = {
-	    #所有提取的音频特征 BBE+MFCC+phonological=142维+100，101两维
-        FEATURE_TYPE_ALL: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716, 717, 718, 719, 720, 721, 722, 723, 724, 725, 726, 727, 728, 729, 730, 731, 732, 733, 734, 735, 736, 737, 738, 739, 740, 741, 742, 743, 744, 745, 746, 747, 748, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759, 760, 761, 762, 100, 101],
-	    #除了BBE的音频特征，BBE有22维 下标0-21
-        FEATURE_TYPE_NO_BBE: [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716, 717, 718, 719, 720, 721, 722, 723, 724, 725, 726, 727, 728, 729, 730, 731, 732, 733, 734, 735, 736, 737, 738, 739, 740, 741, 742, 743, 744, 745, 746, 747, 748, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759, 760, 761, 762],
-	    #除了MFCC的音频特征，MFCC有12维 下标从22-33
-        FEATURE_TYPE_NO_MFCC: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716, 717, 718, 719, 720, 721, 722, 723, 724, 725, 726, 727, 728, 729, 730, 731, 732, 733, 734, 735, 736, 737, 738, 739, 740, 741, 742, 743, 744, 745, 746, 747, 748, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759, 760, 761, 762],
-	    #除了18种音韵类别18 phonological classes 108个统计特征 下标从655-762
-        FEATURE_TYPE_NO_PHONOLOGICAL: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-	
-        FEATURE_TYPE_MEAN_STD_ALL: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 655, 656, 661, 662, 667, 668, 673, 674, 679, 680, 685, 686, 691, 692, 697, 698, 703, 704, 709, 710, 715, 716, 721, 722, 727, 728, 733, 734, 739, 740, 745, 746, 751, 752, 757, 758],
-        FEATURE_TYPE_NO_MIN_MAX_ALL: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 655, 656, 657, 658, 661, 662, 663, 664, 667, 668, 669, 670, 673, 674, 675, 676, 679, 680, 681, 682, 685, 686, 687, 688, 691, 692, 693, 694, 697, 698, 699, 700, 703, 704, 705, 706, 709, 710, 711, 712, 715, 716, 717, 718, 721, 722, 723, 724, 727, 728, 729, 730, 733, 734, 735, 736, 739, 740, 741, 742, 745, 746, 747, 748, 751, 752, 753, 754, 757, 758, 759, 760],
-        FEATURE_TYPE_PLUS: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 116, 117, 118, 119, 120, 121, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 238, 239, 240, 241, 242, 243, 360, 361, 362, 363, 364, 365, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452, 453, 454, 455, 456, 457, 482, 483, 484, 485, 486, 487, 552, 553, 554, 555, 556, 557, 558, 559, 562, 563, 564, 565, 568, 569, 570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716, 717, 718, 719, 720, 721, 722, 723, 724, 725, 726, 727, 728, 729, 730, 731, 732, 733, 734, 735, 736, 737, 738, 739, 740, 741, 742, 743, 744, 745, 746, 747, 748, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759, 760, 761, 762]
-    }
 
-    def __init__(self, feature_type=0, *args, **kwargs):
-        super(HCFDataLoader, self).__init__(*args, **kwargs)
-        self.audio_feature_indices = self.FEATURE_TYPE_DICT[feature_type]
-        self.collate_fn = self.collate_fn_hcf
-
-    def collate_fn_hcf(self, batch):
-        uttrIds = []
-        texts = []
-        labels = []
-        video_features = []
-        video_lens = []
-        audio_features = []
-        audio_lens = []
-        for dp in batch:
-            uttrId, video_feature, audio_feature, word_indices, label = dp
-            uttrIds.append(uttrId)
-            texts.append(word_indices)
-            labels.append(label)
-            video_features.append(torch.tensor(video_feature))
-
-            audio_features.append(torch.tensor(audio_feature).t())
-            video_lens.append(len(video_feature))
-            audio_lens.append(audio_feature.shape[1])
-
-        text_max_len = get_max_len(texts)
-        for i in range(len(texts)):
-            if len(texts[i]) == 0:
-                texts[i] = torch.zeros(text_max_len, 300, dtype=torch.float32)
-            else:
-                texts[i] = padTensor(torch.tensor(texts[i], dtype=torch.float32), text_max_len)
-
-        video_features = torch.cat(video_features, dim=0)
-        audio_features = torch.cat(audio_features, dim=0)
-
-        audio_features = audio_features[:, self.audio_feature_indices]
-
-        return (
-            uttrIds,
-            video_features.float(),
-            video_lens,
-            audio_features.float(),
-            audio_lens,
-            torch.stack(texts),
-            torch.tensor(labels, dtype=torch.float32)
-        )
