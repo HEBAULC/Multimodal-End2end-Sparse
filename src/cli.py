@@ -76,6 +76,7 @@ def get_args():
 
     # Evaluation超参数 3个
     # 评估 验证集 测试集
+    # 使用哪几种模态 默认tav三种模态
     parser.add_argument('-mod', '--modalities', help='what modalities to use', type=str, required=False, default='tav')
     parser.add_argument('--valid', help='Only run validation', action='store_true')
     parser.add_argument('--test', help='Only run test', action='store_true')

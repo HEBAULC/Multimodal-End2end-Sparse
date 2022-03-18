@@ -20,6 +20,7 @@ def multiclass_acc(preds, truths):
 
 # 计算正确率权重
 def weighted_acc(preds, truths, verbose):
+    #preds、truths都看成1列
     preds = preds.view(-1)
     truths = truths.view(-1)
 
@@ -51,8 +52,8 @@ def weighted_acc(preds, truths, verbose):
 
     return w_acc
 
-# 评估MOSEI情绪 他是一个根据回归值区间划分的分类任务
-# sentiment 情绪
+# 评估MOSEI情感分析任务 他是一个根据回归值区间划分的分类任务
+# sentiment 情感(分析) 情感判断极性问题
 def eval_mosei_senti(results, truths, exclude_zero=False):
     # 看成1列
     test_preds = results.view(-1).cpu().detach().numpy()
@@ -61,6 +62,7 @@ def eval_mosei_senti(results, truths, exclude_zero=False):
     non_zeros = np.array([i for i, e in enumerate(test_truth) if e != 0 or (not exclude_zero)])
 
     # 7分类
+    #  [-3,3]范围的里克特量表上针对情绪进行注释：[-3：高度负面，-2 负面，-1 弱负面，0 中性，+1 弱正面，+2 正面，+3 高度正面 ]
     # clip修剪
     # 函数功能：把数组里面的数压缩到设定的值范围,不是放缩，而是截断
     # 大于a_max的值都设置为a_max,小于a_min的值都设置为a_min,介于a_min和a_max之间的值保留不动
@@ -89,10 +91,12 @@ def eval_mosei_senti(results, truths, exclude_zero=False):
 
     return mae, acc2, acc5, acc7, f1, corr
 
+# 评估MSOSIEI情绪识别任务
+# emotion 情绪(识别)
 def eval_mosei_emo(preds, truths, threshold, verbose=False):
     '''
     CMU-MOSEI Emotion is a multi-label classification task
-    CMU-MOSEI 情感是一项多标签分类任务 一个片段可能有许多情感 不只是一个
+    CMU-MOSEI 情绪是一项多标签分类任务 一个片段可能有许多情感 不只是一个
     preds: (bs, num_emotions)
     truths: (bs, num_emotions)
     '''
@@ -155,13 +159,15 @@ def eval_mosei_emo(preds, truths, threshold, verbose=False):
 
     return accs, f1s, aucs, [acc_strict, acc_subset, acc_intersect]
 
-
+# 评估IEMOCAP情绪识别任务
 def eval_iemocap(preds, truths, best_thresholds=None):
     # emos = ["Happy", "Sad", "Angry", "Neutral"]
     # 情感列表=["高兴"，"伤心"，"生气"，"中性"] 四种情感
     '''
     preds: (bs, num_emotions)
+    预测标签：(batchsize，情绪数量)
     truths: (bs, num_emotions)
+    真实标签：(batchsize，情绪数量)
     '''
 
     num_emo = preds.size(1)
@@ -228,15 +234,24 @@ def eval_iemocap(preds, truths, best_thresholds=None):
 
     return (accs, recalls, precisions, f1s, aucs), best_thresholds
 
+# 用CrossEntropyLoss ce交叉熵损失评估IEMOCAP情绪识别任务
 def eval_iemocap_ce(preds, truths):
     # emos = ["Happy", "Sad", "Angry", "Neutral"]
+    # 情感列表=["高兴"，"伤心"，"生气"，"中性"] 四种情感
     '''
     preds: (num_of_data, 4)
     truths: (num_of_data,)
     '''
+    # 取概率最大的标签
     preds = preds.argmax(-1)
+    # https://blog.csdn.net/u011630575/article/details/79645814
+    # https://blog.csdn.net/pearl8899/article/details/109877348
     acc = accuracy_score(truths, preds)
     f1 = f1_score(truths, preds, average='macro')
     r = recall_score(truths, preds, average='macro')
     p = precision_score(truths, preds, average='macro')
     return acc, r, p, f1
+
+# 多分类与多标签
+# https://zhuanlan.zhihu.com/p/358082540
+# https://www.cnblogs.com/ai-learning-blogs/p/11748543.html
