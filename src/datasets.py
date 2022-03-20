@@ -175,6 +175,125 @@ class HCFDataLoader(DataLoader):
             torch.tensor(labels, dtype=torch.float32)
         )
 
+# SIMS中文数据集相关
+#获取SIMS数据集的方法 （获取训练集、验证集、测试集三者其中一个 phase参数决定）
+def get_dataset_sims(data_folder: str, phase: str, img_interval: int, hand_crafted_features: Optional[bool] = False):
+    # 主文件夹
+    main_folder = os.path.join(data_folder, 'SIMS_RAW_PROCESSED')
+    # 元数据
+    meta = load(os.path.join(main_folder, 'meta.pkl'))
+    # 训练集验证集测试集划分的 所有uttr_id
+    ids = open(os.path.join(data_folder, 'SIMS_SPLIT', f'{phase}_split.txt'), 'r').read().splitlines()
+    # 文本 根据uttr_id中的id取出字符串放入列表
+    texts = [meta[id]['text'] for id in ids]
+    # print(texts)
+    # 标签 根据uttr_id中的id取出对应的标签放入列表 6分类标签组成的列表
+    labels = [meta[id]['label'] for id in ids]
+    # print(labels)
+
+    # 分支：如果是手工特征
+    if hand_crafted_features:
+        hcf = load(os.path.join(data_folder, 'MOSEI_HCF_FEATURES', f'mosei_senti_hcf_{phase}.pkl'))
+        return MOSEI_baseline(
+            ids=ids,
+            hcf=hcf,
+            labels=labels
+        )
+
+    # 返回一个类的实例 调用类的初始化方法 有5个参数
+    return SIMS(
+        main_folder=main_folder,
+        ids=ids,
+        texts=texts,
+        labels=labels,
+        img_interval=img_interval
+    )
+
+# SIMS数据集类
+class SIMS(Dataset):
+    def __init__(self, main_folder: str, ids: List[str], texts: List[List[int]], labels: List[int], img_interval: int):
+        super(SIMS, self).__init__()
+        self.ids = ids
+        self.texts = texts
+        self.labels = np.array(labels)
+        self.main_folder = main_folder
+        self.img_interval = img_interval
+        self.crop = transforms.CenterCrop(360)
+
+    #获得注释
+    def get_annotations(self) -> List[str]:
+    #生气、沮丧、害怕、开心、伤心、惊讶六种情感
+        return ['anger', 'disgust', 'fear', 'happy', 'sad', 'surprise']
+
+    #获得正面的比例
+    def getPosWeight(self):
+        pos_nums = self.labels.sum(axis=0)
+        neg_nums = self.__len__() - pos_nums
+        pos_weight = neg_nums / pos_nums
+        return pos_weight
+
+    #通过时间间隔切片
+    def sample_imgs_by_interval(self, folder: str, fps: Optional[int] = 30) -> List[str]:
+        files = glob.glob(f'{folder}/*')
+        nums = len(files) - 1
+        step = int(self.img_interval / 1000 * fps)
+        sampled = [os.path.join(folder, f'image_{i}.jpg') for i in list(range(0, nums, step))]
+        if len(sampled) == 0:
+            step = int(self.img_interval / 1000 * fps) // 4
+            sampled = [os.path.join(folder, f'image_{i}.jpg') for i in list(range(0, nums, step))]
+        return sampled
+
+    #将声波切片
+    def cutSpecToPieces(self, spec, stride=32):
+        # Split the audio waveform by second
+        # 按秒分割音频波形
+        total = -(-spec.size(-1) // stride)
+        specs = []
+        for i in range(total):
+            specs.append(spec[:, :, :, i * stride:(i + 1) * stride])
+
+        # Pad the last piece
+        # 填充最后一片
+        lastPieceLength = specs[-1].size(-1)
+        if lastPieceLength < stride:
+            padRight = stride - lastPieceLength
+            specs[-1] = F.pad(specs[-1], (0, padRight))
+
+        return specs
+
+    # 数据集总大小
+    def __len__(self):
+        return len(self.ids)
+
+    # 获取一个数据点
+    def __getitem__(self, ind: int) -> Tuple[str, np.array, List[torch.tensor], List[int], np.array]:
+        this_id = self.ids[ind]
+        sample_folder = os.path.join(self.main_folder, this_id)
+
+        sampledImgs = []
+        for imgPath in self.sample_imgs_by_interval(sample_folder):
+            this_img = Image.open(imgPath)
+            H = np.float32(this_img).shape[0]
+            W = np.float32(this_img).shape[1]
+            if H > 360:
+                resize = transforms.Resize([H // 2, W // 2])
+                this_img = resize(this_img)
+            this_img = self.crop(this_img)
+            sampledImgs.append(np.float32(this_img))
+        sampledImgs = np.array(sampledImgs)
+
+        waveform, sr = torchaudio.load(os.path.join(sample_folder, f'audio.wav'))
+
+        # Cut Spec
+        specgram = torchaudio.transforms.MelSpectrogram(
+            sample_rate=sr,
+            win_length=int(float(sr) / 16000 * 400),
+            n_fft=int(float(sr) / 16000 * 400)
+        )(waveform).unsqueeze(0)
+        specgrams = self.cutSpecToPieces(specgram)
+
+        return this_id, sampledImgs, specgrams, self.texts[ind], self.labels[ind]
+
 # MOSEI相关
 #获取mosei数据集的方法 （获取训练集、验证集、测试集三者其中一个 phase参数决定）
 def get_dataset_mosei(data_folder: str, phase: str, img_interval: int, hand_crafted_features: Optional[bool] = False):
@@ -182,12 +301,14 @@ def get_dataset_mosei(data_folder: str, phase: str, img_interval: int, hand_craf
     main_folder = os.path.join(data_folder, 'MOSEI_RAW_PROCESSED')
     # 元数据
     meta = load(os.path.join(main_folder, 'meta.pkl'))
-    # 训练集验证集测试集划分的uttr_id
+    # 训练集验证集测试集划分的 所有uttr_id
     ids = open(os.path.join(data_folder, 'MOSEI_SPLIT', f'{phase}_split.txt'), 'r').read().splitlines()
-    # 文本
+    # 文本 根据uttr_id中的id取出字符串放入列表
     texts = [meta[id]['text'] for id in ids]
-    # 标签
+    print(texts)
+    # 标签 根据uttr_id中的id取出对应的标签放入列表
     labels = [meta[id]['label'] for id in ids]
+    print(labels)
 
     # 分支：如果是手工特征
     if hand_crafted_features:
@@ -287,7 +408,7 @@ class MOSEI(Dataset):
 
     #获得注释
     def get_annotations(self) -> List[str]:
-	    #生气、沮丧、害怕、开心、伤心、惊讶六种情感
+    #生气、沮丧、害怕、开心、伤心、惊讶六种情感
         return ['anger', 'disgust', 'fear', 'happy', 'sad', 'surprise']
 
     #获得正面的比例

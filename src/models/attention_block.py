@@ -66,6 +66,7 @@ class SparseCrossModalAttentionLayer(nn.Module):
             sample_points_lens.append(len(locations[locations[:, 2] == i]))
 
         # how much points are left in each batch
+        # 每个批次还剩多少数据点
         batch_points_lens = []
         pointer = 0
         for l in x_lens:
@@ -100,6 +101,7 @@ def to_sparse_by_cdf(t: torch.tensor, lens, cdf: float):
         this_t_sorted, indices = torch.sort(this_t, descending=True)
         mask = torch.cumsum(this_t_sorted, dim=-1) < cdf
         mask[torch.sum(mask)] = True
+        # mask[torch.sum(mask)] = False
         _t[i][indices[mask]] = 1
         _t[i][indices[~mask]] = 0
 
