@@ -62,29 +62,45 @@ if __name__ == "__main__":
                                       num_workers=2, collate_fn=collate_fn)
             test_loader = DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False,
                                      num_workers=2, collate_fn=collate_fn)
-    elif args['dataset'] == 'mosei':
-        train_dataset = get_dataset_mosei(data_folder=args['datapath'], phase='train', img_interval=args['img_interval'], hand_crafted_features=args['hand_crafted'])
-        valid_dataset = get_dataset_mosei(data_folder=args['datapath'], phase='valid', img_interval=args['img_interval'], hand_crafted_features=args['hand_crafted'])
-        test_dataset = get_dataset_mosei(data_folder=args['datapath'], phase='test', img_interval=args['img_interval'], hand_crafted_features=args['hand_crafted'])
 
-        train_loader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True, num_workers=2, collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
-        valid_loader = DataLoader(valid_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2, collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
-        test_loader = DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2, collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+    elif args['dataset'] == 'mosei':
+        train_dataset = get_dataset_mosei(data_folder=args['datapath'], phase='train', img_interval=args['img_interval']
+                                          , hand_crafted_features=args['hand_crafted'])
+        valid_dataset = get_dataset_mosei(data_folder=args['datapath'], phase='valid', img_interval=args['img_interval']
+                                          , hand_crafted_features=args['hand_crafted'])
+        test_dataset = get_dataset_mosei(data_folder=args['datapath'], phase='test', img_interval=args['img_interval']
+                                         , hand_crafted_features=args['hand_crafted'])
+
+        train_loader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True, num_workers=2
+                                  , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        valid_loader = DataLoader(valid_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2
+                                  , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        test_loader = DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2
+                                 , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+
     elif args['dataset'] == 'sims':
-        train_dataset = get_dataset_sims(data_folder=args['datapath'], phase='train',
-                                          img_interval=args['img_interval'], hand_crafted_features=args['hand_crafted'])
-        valid_dataset = get_dataset_sims(data_folder=args['datapath'], phase='valid',
-                                          img_interval=args['img_interval'], hand_crafted_features=args['hand_crafted'])
-        test_dataset = get_dataset_sims(data_folder=args['datapath'], phase='test', img_interval=args['img_interval'],
+        train_dataset = get_dataset_sims(data_folder=args['datapath'], phase='train', img_interval=args['img_interval'],
                                          hand_crafted_features=args['hand_crafted'])
+        valid_dataset = get_dataset_sims(data_folder=args['datapath'], phase='valid', img_interval=args['img_interval'],
+                                         hand_crafted_features=args['hand_crafted'])
+        test_dataset = get_dataset_sims(data_folder=args['datapath'], phase='test', img_interval=args['img_interval'],
+                                        hand_crafted_features=args['hand_crafted'])
+
+        train_loader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True, num_workers=2
+                                  , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        valid_loader = DataLoader(valid_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2
+                                  , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        test_loader = DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2
+                                 , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
 
         # 人工特征
-        train_loader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True, num_workers=2,
-                                  collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
-        valid_loader = DataLoader(valid_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2,
-                                  collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
-        test_loader = DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2,
-                                 collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        # train_loader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True, num_workers=2,
+        #                           collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        # valid_loader = DataLoader(valid_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2,
+        #                           collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        # test_loader = DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2,
+        #                          collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+
 
     # 打印训练集、验证集、测试集样本数量信息
     print(f'# Train samples = {len(train_loader.dataset)}')
@@ -166,10 +182,15 @@ if __name__ == "__main__":
     # 分支模块4：处理loss参数 设置损失函数的类型
     if args['loss'] == 'l1':
         criterion = torch.nn.L1Loss()
+
     elif args['loss'] == 'mse':
         criterion = torch.nn.MSELoss()
+
+    # 单个标签多分类时使用ce
     elif args['loss'] == 'ce':
         criterion = torch.nn.CrossEntropyLoss()
+
+    # 多标签分类时使用bce
     elif args['loss'] == 'bce':
         pos_weight = train_dataset.getPosWeight()
         pos_weight = torch.tensor(pos_weight).to(device)
@@ -183,6 +204,7 @@ if __name__ == "__main__":
     #     trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
 
     if args['dataset'] == 'sims':
+        # torch.multiprocessing.set_start_method('spawn')
         trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
 
     # 分支模块6:处理训练方式

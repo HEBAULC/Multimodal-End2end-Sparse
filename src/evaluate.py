@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from sklearn.metrics import accuracy_score, f1_score, recall_score, roc_auc_score, precision_score
 
-# 多分类正确率
+# 多类别分类正确率 和mmsa1.0中一样 计算一个batch样本的正确率
 def multiclass_acc(preds, truths):
     # round() 方法返回浮点数x的四舍五入值
     '''
@@ -16,6 +16,8 @@ def multiclass_acc(preds, truths):
     2、np.sum(np.round(preds) == np.round(truths)) 求和 算出所有为1的总数 也就是预测正确的个事
     3、np.sum(np.round(preds) == np.round(truths)) / float(len(truths)) 预测正确的个数除以总个数 算出正确率
     '''
+
+    # 返回分类的正确率
     return np.sum(np.round(preds) == np.round(truths)) / float(len(truths))
 
 # 计算正确率权重
@@ -51,6 +53,83 @@ def weighted_acc(preds, truths, verbose):
         print('TP=', tp, 'TN=', tn, 'FP=', fp, 'FN=', fn, 'P=', p, 'N', n, 'Recall', recall, "f1", f1)
 
     return w_acc
+
+# 评估SIMS情感分析任务 他是一个根据回归值区间划分的分类任务
+# sentiment 情感(分析) 情感判断极性问题
+def eval_sims_senti(results, truths, exclude_zero=False): # 是否包含0,默认不含0
+    # 看成1列 tensor转到cpu 去梯度 转numpy
+    test_preds = results.view(-1).cpu().detach().numpy()
+    test_truth = truths.view(-1).cpu().detach().numpy()
+
+    # 去掉test_truth中的0值
+    non_zeros = np.array([i for i, e in enumerate(test_truth) if e != 0 or (not exclude_zero)])
+
+    # 截取到-1到1区间
+    test_preds = np.clip(test_preds, a_min=-1., a_max=1.)
+    test_truth = np.clip(test_truth, a_min=-1., a_max=1.)
+
+    # two classes{[-1.0, 0.0], (0.0, 1.0]} 两个类别 两个区间段
+    ms_2 = [-1.01, 0.0, 1.01]
+
+    # 拷贝一个副本
+    test_preds_a2 = test_preds.copy()
+    test_truth_a2 = test_truth.copy()
+    for i in range(2): #0 1
+        # 将预测值根据区间判断为消极、积极 0、1
+        test_preds_a2[np.logical_and(test_preds > ms_2[i], test_preds <= ms_2[i + 1])] = i
+
+    for i in range(2):
+        # 将标签值根据区间判断为消极、积极 0、1
+        test_truth_a2[np.logical_and(test_truth > ms_2[i], test_truth <= ms_2[i + 1])] = i
+
+    # three classes{[-1.0, -0.1], (-0.1, 0.1], (0.1, 1.0]} 三个类别 三个区间段
+    ms_3 = [-1.01, -0.1, 0.1, 1.01]
+    test_preds_a3 = test_preds.copy()
+    test_truth_a3 = test_truth.copy()
+
+    for i in range(3): # 0、1、2
+        test_preds_a3[np.logical_and(test_preds > ms_3[i], test_preds <= ms_3[i + 1])] = i
+        # 将预测值根据区间判断为消极、中性、积极 0、1、2
+
+    for i in range(3):
+        # 将标签值根据区间判断为消极、中性、积极 0、1、2
+        test_truth_a3[np.logical_and(test_truth > ms_3[i], test_truth <= ms_3[i + 1])] = i
+
+    # five classes{[-1.0, -0.7], (-0.7, -0.1], (-0.1, 0.1], (0.1, 0.7], (0.7, 1.0]} 五个类别 五个区间段
+    ms_5 = [-1.01, -0.7, -0.1, 0.1, 0.7, 1.01]
+    test_preds_a5 = test_preds.copy()
+    test_truth_a5 = test_truth.copy()
+    for i in range(5): #0、1、2、3、4
+        # 将预测值根据区间判断为消极、弱消极、中性、弱积极、积极 0、1、2、3、4
+        test_preds_a5[np.logical_and(test_preds > ms_5[i], test_preds <= ms_5[i + 1])] = i
+
+    for i in range(5):
+        # 将标签值根据区间判断为消极、弱消极、中性、弱积极、积极 0、1、2、3、4
+        test_truth_a5[np.logical_and(test_truth > ms_5[i], test_truth <= ms_5[i + 1])] = i
+
+    # 计算分类效果指标
+    # L1距离的平均值
+    mae = np.mean(np.absolute(test_preds - test_truth))  # Average L1 distance between preds and truths
+    # 矩阵相关系数
+    corr = np.corrcoef(test_preds, test_truth)[0][1]
+    acc2 = multiclass_acc(test_preds_a2, test_truth_a2)
+    acc3 = multiclass_acc(test_preds_a3, test_truth_a3)
+    acc5 = multiclass_acc(test_preds_a5, test_truth_a5)
+    # 二分类的f1
+    f1 = f1_score(test_truth_a2, test_preds_a2, average='weighted')
+
+    # 构造成字典 mmsa1.0的做法
+    # eval_results = {
+    #     "Mult_acc_2": acc2,
+    #     "Mult_acc_3": acc3,
+    #     "Mult_acc_5": acc5,
+    #     "F1_score": f1,
+    #     "MAE": mae,
+    #     "Corr": corr,  # Correlation Coefficient
+    # }
+    #return eval_results
+
+    return acc2, acc3, acc5, f1, mae, corr
 
 # 评估MOSEI情感分析任务 他是一个根据回归值区间划分的分类任务
 # sentiment 情感(分析) 情感判断极性问题

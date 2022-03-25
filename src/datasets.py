@@ -305,10 +305,10 @@ def get_dataset_mosei(data_folder: str, phase: str, img_interval: int, hand_craf
     ids = open(os.path.join(data_folder, 'MOSEI_SPLIT', f'{phase}_split.txt'), 'r').read().splitlines()
     # 文本 根据uttr_id中的id取出字符串放入列表
     texts = [meta[id]['text'] for id in ids]
-    print(texts)
+    # print(texts)
     # 标签 根据uttr_id中的id取出对应的标签放入列表
     labels = [meta[id]['label'] for id in ids]
-    print(labels)
+    # print(labels)
 
     # 分支：如果是手工特征
     if hand_crafted_features:

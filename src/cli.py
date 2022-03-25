@@ -21,12 +21,12 @@ def get_args():
     parser.add_argument('-cu', '--cuda', help='Cude device number', type=str, required=False, default='0')
     # 梯度裁剪 防止梯度爆炸
     parser.add_argument('-cl', '--clip', help='Use clip to gradients', type=float, required=False, default=-1.0)
-    # 调度器
+    # 调度器-衰减学习率
     parser.add_argument('-sc', '--scheduler', help='Use scheduler to optimizer', action='store_true')
     # 随机数种子
     parser.add_argument('-se', '--seed', help='Random seed', type=int, required=False, default=0)
     # 损失函数
-    parser.add_argument('--loss', help='loss function', type=str, required=False, default='bce')
+    parser.add_argument('--loss', help='loss function', type=str, required=False, default='bce')#default='bce'
     # 优化方法adam/sgd
     parser.add_argument('--optim', help='optimizer function: adam/sgd', type=str, required=False, default='adam')
     # 考虑文本模型的学习率
@@ -39,7 +39,7 @@ def get_args():
     # 预训练文本模型的大小 默认base
     parser.add_argument('--text-model-size', help='Size of the pre-trained text model', type=str, required=False, default='base')
     # 如何融合模态 默认早期融合
-    parser.add_argument('--fusion', help='How to fuse modalities', type=str, required=False, default='early')
+    parser.add_argument('--fusion', help='How to fuse modalities', type=str, required=False, default='late')#early
     # 每个模态模型输出的特征维度 默认256
     parser.add_argument('--feature-dim', help='Dimension of features outputed by each modality model', type=int, required=False, default=256)
     # 稀疏 CNN 层的阈值 default=0.9
@@ -72,7 +72,7 @@ def get_args():
     # 数据路经
     parser.add_argument('--datapath', help='Path of data', type=str, required=False, default='/home/luocong/projects/data/data')
     # 数据集
-    parser.add_argument('--dataset', help='Use which dataset', type=str, required=False, default='iemocap')
+    parser.add_argument('--dataset', help='Use which dataset', type=str, required=False, default='iemocap')# #sims
 
     # Evaluation超参数 3个
     # 评估 验证集 测试集
