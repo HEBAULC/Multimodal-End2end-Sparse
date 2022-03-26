@@ -25,5 +25,5 @@ class MME2E_T(nn.Module):
             return cls_feature
 
         # 获取文本特征
-        text_features = self.text_feature_affine(last_hidden_state).sum(1)
+        text_features = self.text_feature_affine(last_hidden_state).sum(1) # 在1轴进行相加 squence_lenth所在轴
         return text_features

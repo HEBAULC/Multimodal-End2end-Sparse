@@ -197,15 +197,15 @@ if __name__ == "__main__":
         criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         # criterion = torch.nn.BCEWithLogitsLoss()
 
-    # 分支模块5：如果是'iemocap' or 'mosei'数据集 调用IemocapTrainer训练函数
-    # if args['dataset'] == 'iemocap' or 'mosei':
-    #     trainer = IemocapTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
-    # elif args['dataset'] == 'sims':
-    #     trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
-
-    if args['dataset'] == 'sims':
-        # torch.multiprocessing.set_start_method('spawn')
+    # 分支模块5：如果是'iemocap' or 'mosei'数据集 调用IemocapTrainer训练函数 训练新数据集时需要自己手动更换
+    if args['dataset'] == 'iemocap' or 'mosei':
+        trainer = IemocapTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
+    elif args['dataset'] == 'sims':
         trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
+
+    # if args['dataset'] == 'sims':
+    #     # torch.multiprocessing.set_start_method('spawn')
+    #     trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
 
     # 分支模块6:处理训练方式
     if args['test']:

@@ -38,8 +38,9 @@ def get_args():
     parser.add_argument('-mo', '--model', help='Which model', type=str, required=False, default='mme2e')
     # 预训练文本模型的大小 默认base
     parser.add_argument('--text-model-size', help='Size of the pre-trained text model', type=str, required=False, default='base')
-    # 如何融合模态 默认早期融合
-    parser.add_argument('--fusion', help='How to fuse modalities', type=str, required=False, default='late')#early
+    # 如何融合模态 原来默认早期融合
+    # 明明代码实现的是后期融合 但是这里默认原来写的early 可能是作者写错了
+    parser.add_argument('--fusion', help='How to fuse modalities', type=str, required=False, default='late')
     # 每个模态模型输出的特征维度 默认256
     parser.add_argument('--feature-dim', help='Dimension of features outputed by each modality model', type=int, required=False, default=256)
     # 稀疏 CNN 层的阈值 default=0.9
