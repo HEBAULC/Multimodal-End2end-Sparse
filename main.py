@@ -7,6 +7,7 @@ from src.cli import get_args
 from src.datasets import get_dataset_iemocap, collate_fn, HCFDataLoader, get_dataset_mosei, collate_fn_hcf_mosei, \
     get_dataset_sims
 # from src.models.e2e import MME2E
+from src.models.e2e_lf_dnn import MME2E_LFDNN
 from src.models.sparse_e2e import MME2E_Sparse
 from src.models.e2e import MME2E
 from src.models.baselines.lf_rnn import LF_RNN
@@ -140,6 +141,29 @@ if __name__ == "__main__":
                 {'params': model.a_out.parameters()},
                 {'params': model.weighted_fusion.parameters()},
             ], lr=lr, weight_decay=args['weight_decay'])
+    elif args['model'] == 'mme2e_dnn':
+        model = MME2E_LFDNN(args=args, device=device)
+        model = model.to(device=device)
+
+        # When using a pre-trained text modal, you can use text_lr_factor to give a smaller leraning rate to the textual model parts
+        # 使用预训练文本模态时，可以使用 text_lr_factor 为文本模型部分提供较小的学习率
+        if args['text_lr_factor'] == 1:
+            optimizer = torch.optim.Adam(model.parameters(), lr=args['learning_rate'],
+                                         weight_decay=args['weight_decay'])
+        else:
+            optimizer = torch.optim.Adam([
+                {'params': model.T.parameters(), 'lr': lr / args['text_lr_factor']},
+                # {'params': model.t_out.parameters(), 'lr': lr / args['text_lr_factor']},
+                {'params': model.V.parameters()},
+                # {'params': model.v_flatten.parameters()},
+                {'params': model.v_transformer.parameters()},
+                # {'params': model.v_out.parameters()},
+                {'params': model.A.parameters()},
+                # {'params': model.a_flatten.parameters()},
+                {'params': model.a_transformer.parameters()},
+                # {'params': model.a_out.parameters()},
+                {'params': model.weighted_fusion.parameters()},
+            ], lr=lr, weight_decay=args['weight_decay'])
     elif args['model'] == 'mme2e_sparse':
         model = MME2E_Sparse(args=args, device=device)
         model = model.to(device=device)
@@ -198,14 +222,14 @@ if __name__ == "__main__":
         # criterion = torch.nn.BCEWithLogitsLoss()
 
     # 分支模块5：如果是'iemocap' or 'mosei'数据集 调用IemocapTrainer训练函数 训练新数据集时需要自己手动更换
-    if args['dataset'] == 'iemocap' or 'mosei':
-        trainer = IemocapTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
-    elif args['dataset'] == 'sims':
-        trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
-
-    # if args['dataset'] == 'sims':
-    #     # torch.multiprocessing.set_start_method('spawn')
+    # if args['dataset'] == 'iemocap' or 'mosei':
+    #     trainer = IemocapTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
+    # elif args['dataset'] == 'sims':
     #     trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
+
+    if args['dataset'] == 'sims':
+        # torch.multiprocessing.set_start_method('spawn')
+        trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
 
     # 分支模块6:处理训练方式
     if args['test']:

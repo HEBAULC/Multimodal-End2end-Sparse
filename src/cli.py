@@ -47,7 +47,7 @@ def get_args():
     parser.add_argument('-st', '--sparse-threshold', help='Threshold of sparse CNN layers', type=float, required=False, default=0.9)
     # 手工制作的特征尺寸 default=[300, 144, 35]
     parser.add_argument('-hfcs', '--hfc-sizes', help='Hand crafted feature sizes', nargs='+', type=int, required=False, default=[300, 144, 35])
-    # CNN后transformer的大小 default=512
+    # CNN后transformer的维度 default=512
     parser.add_argument('--trans-dim', help='Dimension of the transformer after CNN', type=int, required=False, default=512)
     # CNN后transformer的层数  default=2
     parser.add_argument('--trans-nlayers', help='Number of layers of the transformer after CNN', type=int, required=False, default=2)

@@ -96,7 +96,8 @@ class SimsTrainer(TrainerBase):
                     ['Valid', *valid_stats_str],
                     ['Test', *test_stats_str]
                 ], headers=self.header))
-                if valid_stats[3] > self.best_valid_stats[3]:
+                # if valid_stats[3] > self.best_valid_stats[3]:
+                if valid_stats[4] < self.best_valid_stats[4]:
                     # print('valid_stats', valid_stats)
                     # print('best_valid_stats', self.best_valid_stats)
                     #
@@ -276,6 +277,8 @@ class SimsTrainer(TrainerBase):
 
             pbar.set_description(f"{phase} loss:{epoch_loss/data_size:.4f}")
 
+        # eval_one_epoch时候出错 dnn 将e2e_lf_dnn.py最后的squeeze()去掉即可
+        # RuntimeError: zero-dimensional tensor (at position 57) cannot be concatenated
         total_logits = torch.cat(total_logits, dim=0)
         total_Y = torch.cat(total_Y, dim=0)
 

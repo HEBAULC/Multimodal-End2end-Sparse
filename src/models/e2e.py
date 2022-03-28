@@ -9,7 +9,7 @@ from src.models.vgg_block import VggBasicBlock
 
 
 class MME2E(nn.Module):
-	# 魔法函数
+    # 魔法函数
     def __init__(self, args, device):
         super(MME2E, self).__init__()
         # 情感类别数量
@@ -18,39 +18,40 @@ class MME2E(nn.Module):
         self.args = args
         self.mod = args['modalities'].lower()
         self.device = device
-        # 特征维度
+        # 每个模态最终输出的特征维度 default=256
         self.feature_dim = args['feature_dim']
         # 训练的层数
         nlayers = args['trans_nlayers']
         # 训练的头数
         nheads = args['trans_nheads']
-        # 训练的维度
+        # 训练的transformer维度 default=512
         trans_dim = args['trans_dim']
-		
-		# 以下都是进入transformer之前的准备工作 也就是模型自动提取特征的部分
-		
-		#文本嵌入维度
+
+        # 以下都是进入transformer之前的准备工作 也就是模型自动提取特征的部分
+
+        # 文本嵌入维度
         # base
         text_cls_dim = 768
 
-        #文本模型的大小
+        # 文本模型的大小
         if args['text_model_size'] == 'large':
             text_cls_dim = 1024
         if args['text_model_size'] == 'xlarge':
             text_cls_dim = 2048
-		
-		# 文本模态调用MME2E_T函数
+
+        # 文本模态调用MME2E_T函数
+        # 768->512->256
         self.T = MME2E_T(feature_dim=self.feature_dim, size=args['text_model_size'])
-		
-		# 视觉模态的预处理
-		# 调用MTCNN模块提取人脸 from facenet_pytorch import MTCNN
+
+        # 视觉模态的预处理
+        # 调用MTCNN模块提取人脸 from facenet_pytorch import MTCNN
         self.mtcnn = MTCNN(image_size=48, margin=2, post_process=False, device=device)
         # 归一化
         self.normalize = transforms.Normalize(mean=[159, 111, 102], std=[37, 33, 32])
-		
-		# 处理视觉模态的特征
+
+        # 处理视觉模态的特征
         self.V = nn.Sequential(
-        	# 2d卷积提取特征
+            # 2d卷积提取特征
             nn.Conv2d(in_channels=3, out_channels=64, kernel_size=5, padding=2),
             # 批量归一化
             nn.BatchNorm2d(64),
@@ -71,9 +72,9 @@ class MME2E(nn.Module):
             VggBasicBlock(in_planes=256, out_planes=512),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
-		
-		# 音频模态的模型
-		# 和对图像处理的模型一摸一样，对MFCC频率图像进行特征提取
+
+        # 音频模态的模型
+        # 和对图像处理的模型一摸一样，对MFCC频率图像进行特征提取
         self.A = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=64, kernel_size=5, padding=2),
             nn.BatchNorm2d(64),
@@ -88,41 +89,41 @@ class MME2E(nn.Module):
             VggBasicBlock(in_planes=256, out_planes=512),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
-		
-		# 对视觉模态特征进行线性变换+非线性变换 变换到transformer的输入维度
+
+        # 对视觉模态特征进行线性变换+非线性变换 变换到transformer的输入维度
         self.v_flatten = nn.Sequential(
             nn.Linear(512 * 3 * 3, 1024),
             nn.ReLU(),
             nn.Linear(1024, trans_dim)
         )
 
-		# 对音频模态特征进行线性变换+非线性变换 变换到transformer的输入维度
+        # 对音频模态特征进行线性变换+非线性变换 变换到transformer的输入维度 default=512
         self.a_flatten = nn.Sequential(
             nn.Linear(512 * 8 * 2, 1024),
             nn.ReLU(),
             nn.Linear(1024, trans_dim)
         )
-		
-		# 将变换后视频和音频特征送入 包裹式transformer编码器
+
+        # 将变换后视频和音频特征送入 包裹式transformer编码器
         self.v_transformer = WrappedTransformerEncoder(dim=trans_dim, num_layers=nlayers, num_heads=nheads)
         self.a_transformer = WrappedTransformerEncoder(dim=trans_dim, num_layers=nlayers, num_heads=nheads)
 
         # 对视频的FFN 全连接层 trans_dim->num_classes
         self.v_out = nn.Linear(trans_dim, self.num_classes)
-        # 对文本的的FFN 全连接层 text_cls_dim->num_classes
+        # 对文本的的FFN 全连接层 text_cls_dim base=768->num_classes
         self.t_out = nn.Linear(text_cls_dim, self.num_classes)
         # 对音频的的FFN 全连接层 trans_dim->num_classes
         self.a_out = nn.Linear(trans_dim, self.num_classes)
         # 加权融合 默认情况下 3->1
         self.weighted_fusion = nn.Linear(len(self.mod), 1, bias=False)
 
-	# 前向传播
+    # 前向传播
     def forward(self, imgs, imgs_lens, specs, spec_lens, text):
         all_logits = []
 
         if 't' in self.mod:
             text_cls = self.T(text, get_cls=True)
-            # FFN text_feature(768)将仿射变幻后的feature_dim(512)维度映射为num_classes个输出
+            # FFN text_feature(768)将仿射变幻后的feature_dim(256)维度映射为num_classes个输出
             text_cls = self.t_out(text_cls)
             # print('text_cls', text_cls)
             '''
@@ -318,8 +319,8 @@ class MME2E(nn.Module):
         # self.weighted_fusion(stack) [8, 6 ,3]->[8, 6 ,1]
         # .squeeze(-1) [8, 6 ,1]->[8, 6]
         return self.weighted_fusion(stack).squeeze(-1)
-	
-	# 图像中心裁剪 
+
+    # 图像中心裁剪
     def crop_img_center(self, img: torch.tensor, target_size=48):
         '''
         Some images have un-detectable faces,
@@ -335,6 +336,6 @@ class MME2E(nn.Module):
         @img - (channel, height, width)
         '''
         current_size = img.size(1)
-        off = (current_size - target_size) // 2 # offset
+        off = (current_size - target_size) // 2  # offset
         cropped = img[:, off:off + target_size, off - target_size // 2:off + target_size // 2]
         return cropped
