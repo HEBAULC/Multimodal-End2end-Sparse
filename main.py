@@ -34,7 +34,11 @@ if __name__ == "__main__":
     # Set device
     # 设置运行的设备
     os.environ["CUDA_VISIBLE_DEVICES"] = args['cuda']
+    # 使用gpu加速
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+    # 使用cpu进行测试
+    # device = torch.device('cpu')
     # device = torch.device(f"cuda:{args['cuda']}" if torch.cuda.is_available() else 'cpu')
     # torch.cuda.set_device(int(args['cuda']))
 
@@ -123,7 +127,8 @@ if __name__ == "__main__":
         model = MME2E(args=args, device=device)
         model = model.to(device=device)
 
-        # When using a pre-trained text modal, you can use text_lr_factor to give a smaller leraning rate to the textual model parts
+        # When using a pre-trained text modal,
+        # you can use text_lr_factor to give a smaller leraning rate to the textual model parts
         # 使用预训练文本模态时，可以使用 text_lr_factor 为文本模型部分提供较小的学习率
         if args['text_lr_factor'] == 1:
             optimizer = torch.optim.Adam(model.parameters(), lr=args['learning_rate'], weight_decay=args['weight_decay'])
@@ -145,7 +150,8 @@ if __name__ == "__main__":
         model = MME2E_LFDNN(args=args, device=device)
         model = model.to(device=device)
 
-        # When using a pre-trained text modal, you can use text_lr_factor to give a smaller leraning rate to the textual model parts
+        # When using a pre-trained text modal,
+        # you can use text_lr_factor to give a smaller leraning rate to the textual model parts
         # 使用预训练文本模态时，可以使用 text_lr_factor 为文本模型部分提供较小的学习率
         if args['text_lr_factor'] == 1:
             optimizer = torch.optim.Adam(model.parameters(), lr=args['learning_rate'],
@@ -222,14 +228,14 @@ if __name__ == "__main__":
         # criterion = torch.nn.BCEWithLogitsLoss()
 
     # 分支模块5：如果是'iemocap' or 'mosei'数据集 调用IemocapTrainer训练函数 训练新数据集时需要自己手动更换
-    # if args['dataset'] == 'iemocap' or 'mosei':
-    #     trainer = IemocapTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
-    # elif args['dataset'] == 'sims':
-    #     trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
-
-    if args['dataset'] == 'sims':
-        # torch.multiprocessing.set_start_method('spawn')
+    if args['dataset'] == 'iemocap' or 'mosei' or 'mmsa-mosei':
+        trainer = IemocapTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
+    elif args['dataset'] == 'sims':
         trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
+
+    # if args['dataset'] == 'sims':
+    #     # torch.multiprocessing.set_start_method('spawn')
+    #     trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
 
     # 分支模块6:处理训练方式
     if args['test']:

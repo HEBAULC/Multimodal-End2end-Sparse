@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from src.models.e2e_t import MME2E_T
+from src.models.e2e_t_zh import MME2E_T_ZH
 
 from src.models.transformer_encoder import WrappedTransformerEncoder
 from torchvision import transforms
@@ -42,6 +43,7 @@ class MME2E(nn.Module):
         # 文本模态调用MME2E_T函数
         # 768->512->256
         self.T = MME2E_T(feature_dim=self.feature_dim, size=args['text_model_size'])
+        # self.T = MME2E_T_ZH(feature_dim=self.feature_dim, size=args['text_model_size'])
 
         # 视觉模态的预处理
         # 调用MTCNN模块提取人脸 from facenet_pytorch import MTCNN

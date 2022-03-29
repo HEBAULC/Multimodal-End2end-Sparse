@@ -10,9 +10,9 @@ class LF_DNN_Block(nn.Module):
     使用深度神经网络进行后期融合
     """
 
-    def __init__(self, dropouts):
+    def __init__(self, num_classes, dropouts):
         super(LF_DNN_Block, self).__init__()
-        post_fusion_dim, output_dim = (32, 1)
+        post_fusion_dim, output_dim = (32, num_classes)
         # 后期融合的维度
         self.text_hidden_size, self.audio_hidden_size, self.video_hidden_size = (128, 32, 128)
 

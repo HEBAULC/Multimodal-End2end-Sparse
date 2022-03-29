@@ -47,10 +47,12 @@ class MME2E_LFDNN(nn.Module):
         # 文本模态调用MME2E_T函数
         # 768->512->256
         self.T = MME2E_T(feature_dim=self.feature_dim, size=args['text_model_size'])
+
+        # MME2E_T中有affine这里就不用affine
         self.Text_affine = nn.Sequential(
             nn.Dropout(dropout),
-            nn.Linear(text_cls_dim, self.feature_dim),
-            nn.Linear(self.feature_dim, text_hidden_size)
+            nn.Linear(text_cls_dim, self.feature_dim), #feature_dim 512
+            nn.Linear(self.feature_dim, text_hidden_size) #text_hidden_size 128
         )
 
         # video, audio 输入transformer编码器之前的准备工作
@@ -126,7 +128,7 @@ class MME2E_LFDNN(nn.Module):
         self.a_hidden = nn.Linear(trans_dim, audio_hidden_size)
 
         #self.Text_affine, self.a_hidden, self.v_hidden,
-        self.weighted_fusion = LF_DNN_Block(dropout)
+        self.weighted_fusion = LF_DNN_Block(self.num_classes, dropout)
 
     # 前向传播
     def forward(self, imgs, imgs_lens, specs, spec_lens, text):
@@ -134,9 +136,11 @@ class MME2E_LFDNN(nn.Module):
         all_logits = []
 
         if 't' in self.mod:
-            text_cls = self.T(text, get_cls=True)
+            text_cls= self.T(text, get_cls=True)
             # FFN text_feature(768)将仿射变幻后的feature_dim(256)维度映射为num_classes个输出
             # RuntimeError: mat1 and mat2 shapes cannot be multiplied (8x768 and 256x128)
+
+            # RuntimeError: mat1 and mat2 shapes cannot be multiplied (8x1024 and 768x256)
             text_hidden = self.Text_affine(text_cls)
 
             # text_cls = self.t_out(text_cls)
