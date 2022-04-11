@@ -5,7 +5,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 from src.cli import get_args
 from src.datasets import get_dataset_iemocap, collate_fn, HCFDataLoader, get_dataset_mosei, collate_fn_hcf_mosei, \
-    get_dataset_sims
+    get_dataset_sims, get_dataset_mmsa_mosei
 # from src.models.e2e import MME2E
 from src.models.e2e_lf_dnn import MME2E_LFDNN
 from src.models.sparse_e2e import MME2E_Sparse
@@ -93,6 +93,31 @@ if __name__ == "__main__":
 
         train_loader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True, num_workers=2
                                   , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        valid_loader = DataLoader(valid_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2
+                                  , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        test_loader = DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2
+                                 , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+
+        # 人工特征
+        # train_loader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True, num_workers=2,
+        #                           collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        # valid_loader = DataLoader(valid_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2,
+        #                           collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        # test_loader = DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2,
+        #                          collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+
+    elif args['dataset'] == 'mmsa-mosei':
+        train_dataset = get_dataset_mmsa_mosei(data_folder=args['datapath'], phase='train', img_interval=args['img_interval'],
+                                         hand_crafted_features=args['hand_crafted'])
+        valid_dataset = get_dataset_mmsa_mosei(data_folder=args['datapath'], phase='valid', img_interval=args['img_interval'],
+                                         hand_crafted_features=args['hand_crafted'])
+        test_dataset = get_dataset_mmsa_mosei(data_folder=args['datapath'], phase='test', img_interval=args['img_interval'],
+                                        hand_crafted_features=args['hand_crafted'])
+
+        train_loader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True, num_workers=2
+                                  , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
+        # train_loader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2
+        #                           , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
         valid_loader = DataLoader(valid_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2
                                   , collate_fn=collate_fn_hcf_mosei if args['hand_crafted'] else collate_fn)
         test_loader = DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False, num_workers=2
@@ -228,14 +253,14 @@ if __name__ == "__main__":
         # criterion = torch.nn.BCEWithLogitsLoss()
 
     # 分支模块5：如果是'iemocap' or 'mosei'数据集 调用IemocapTrainer训练函数 训练新数据集时需要自己手动更换
-    if args['dataset'] == 'iemocap' or 'mosei' or 'mmsa-mosei':
-        trainer = IemocapTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
-    elif args['dataset'] == 'sims':
-        trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
-
-    # if args['dataset'] == 'sims':
-    #     # torch.multiprocessing.set_start_method('spawn')
+    # if args['dataset'] == 'iemocap' or 'mosei':
+    #     trainer = IemocapTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
+    # elif args['dataset'] == 'sims':
     #     trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
+
+    if args['dataset'] == 'sims' or 'mmsa-mosei':
+        # torch.multiprocessing.set_start_method('spawn')
+        trainer = SimsTrainer(args, model, criterion, optimizer, scheduler, device, dataloaders)
 
     # 分支模块6:处理训练方式
     if args['test']:

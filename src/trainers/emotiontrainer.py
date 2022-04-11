@@ -100,8 +100,8 @@ class IemocapTrainer(TrainerBase):
                         # acc:i==0 f1:i==3  auc:i==4
                         # True的条件: 到了average那个位置
                         # False的条件: 所有其他位置
-                        # auc average i应该==3 这里原来的代码写错了
-                        is_pivot = (i == 0 and j == (len(valid_stats[i]) - 1)) # 3
+                        # auc average i应该==4 这里原来的代码 是3写错了
+                        is_pivot = (i == 4 and j == (len(valid_stats[i]) - 1)) # 3
 
                         # 当前验证集这个指标的评价数值大于在最佳验证状态那个对应位置的数值
                         if valid_stats[i][j] > self.best_valid_stats[i][j]:

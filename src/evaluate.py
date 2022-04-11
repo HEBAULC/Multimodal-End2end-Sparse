@@ -62,7 +62,7 @@ def eval_sims_senti(results, truths, exclude_zero=False): # 是否包含0,默认
     test_truth = truths.view(-1).cpu().detach().numpy()
 
     # 去掉test_truth中的0值
-    non_zeros = np.array([i for i, e in enumerate(test_truth) if e != 0 or (not exclude_zero)])
+    # non_zeros = np.array([i for i, e in enumerate(test_truth) if e != 0 or (not exclude_zero)])
 
     # 截取到-1到1区间
     test_preds = np.clip(test_preds, a_min=-1., a_max=1.)

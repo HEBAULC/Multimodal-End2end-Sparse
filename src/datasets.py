@@ -11,14 +11,23 @@ from typing import List, Dict, Tuple, Optional
 from src.utils import load, padTensor, get_max_len
 from PIL import Image
 
-#音频特征指数
-#所有提取的音频特征 BBE+MFCC+phonological=142维
-audio_feature_indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716, 717, 718, 719, 720, 721, 722, 723, 724, 725, 726, 727, 728, 729, 730, 731, 732, 733, 734, 735, 736, 737, 738, 739, 740, 741, 742, 743, 744, 745, 746, 747, 748, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759, 760, 761, 762]
+# 音频特征指数
+# 所有提取的音频特征 BBE+MFCC+phonological=142维
+audio_feature_indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+                         26, 27, 28, 29, 30, 31, 32, 33, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666,
+                         667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685,
+                         686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704,
+                         705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716, 717, 718, 719, 720, 721, 722, 723,
+                         724, 725, 726, 727, 728, 729, 730, 731, 732, 733, 734, 735, 736, 737, 738, 739, 740, 741, 742,
+                         743, 744, 745, 746, 747, 748, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759, 760, 761,
+                         762]
 
-#获取情感字典
+
+# 获取情感字典
 def getEmotionDict() -> Dict[str, int]:
-    #生气：0，激动：1，沮丧：2，开心：3，中性：4，伤心：5  6种情感
+    # 生气：0，激动：1，沮丧：2，开心：3，中性：4，伤心：5  6种情感
     return {'ang': 0, 'exc': 1, 'fru': 2, 'hap': 3, 'neu': 4, 'sad': 5}
+
 
 # 默认是给iemocap数据集使用的
 def collate_fn(batch):
@@ -58,6 +67,7 @@ def collate_fn(batch):
         texts,
         torch.tensor(labels, dtype=torch.float32)
     )
+
 
 # 人工特征数据加载器
 class HCFDataLoader(DataLoader):
@@ -175,19 +185,19 @@ class HCFDataLoader(DataLoader):
             torch.tensor(labels, dtype=torch.float32)
         )
 
-# SIMS中文数据集相关
-#获取SIMS数据集的方法 （获取训练集、验证集、测试集三者其中一个 phase参数决定）
-def get_dataset_sims(data_folder: str, phase: str, img_interval: int, hand_crafted_features: Optional[bool] = False):
+
+def get_dataset_mmsa_mosei(data_folder: str, phase: str, img_interval: int,
+                           hand_crafted_features: Optional[bool] = False):
     # 主文件夹
-    main_folder = os.path.join(data_folder, 'SIMS_RAW_PROCESSED')
+    main_folder = os.path.join(data_folder, 'MOSEI_SEN_PROCESSED')
     # 元数据
     meta = load(os.path.join(main_folder, 'meta.pkl'))
     # 训练集验证集测试集划分的 所有uttr_id
-    ids = open(os.path.join(data_folder, 'SIMS_SPLIT', f'{phase}_split.txt'), 'r').read().splitlines()
+    ids = open(os.path.join(data_folder, 'MOSEI_SEN_SPLIT', f'{phase}_split.txt'), 'r').read().splitlines()
     # 文本 根据uttr_id中的id取出字符串放入列表
     texts = [meta[id]['text'] for id in ids]
     # print(texts)
-    # 标签 根据uttr_id中的id取出对应的标签放入列表 6分类标签组成的列表
+    # 标签 根据uttr_id中的id取出对应的多模态标签放入列表
     labels = [meta[id]['label'] for id in ids]
     # print(labels)
 
@@ -209,6 +219,159 @@ def get_dataset_sims(data_folder: str, phase: str, img_interval: int, hand_craft
         img_interval=img_interval
     )
 
+# 获取SIMS数据集的方法 （获取训练集、验证集、测试集三者其中一个 phase参数决定）
+def get_dataset_mmsa_mosei(data_folder: str, phase: str, img_interval: int, hand_crafted_features: Optional[bool] = False):
+    # 主文件夹
+    main_folder = os.path.join(data_folder, 'MOSEI_SEN_PROCESSED')
+    # 元数据
+    meta = load(os.path.join(main_folder, 'meta.pkl'))
+    # 训练集验证集测试集划分的 所有uttr_id
+    ids = open(os.path.join(data_folder, 'MOSEI_SEN_SPLIT', f'{phase}_split.txt'), 'r').read().splitlines()
+    # 文本 根据uttr_id中的id取出字符串放入列表
+    texts = [meta[id]['text'] for id in ids]
+    # print(texts)
+    # 标签 根据uttr_id中的id取出对应的多模态标签放入列表
+    labels = [meta[id]['label'] for id in ids]
+    # print(labels)
+
+    # 分支：如果是手工特征
+    if hand_crafted_features:
+        hcf = load(os.path.join(data_folder, 'MOSEI_HCF_FEATURES', f'mosei_senti_hcf_{phase}.pkl'))
+        return MOSEI_baseline(
+            ids=ids,
+            hcf=hcf,
+            labels=labels
+        )
+
+    # 返回一个类的实例 调用类的初始化方法 有5个参数
+    return MMSA_MOSEI(
+        main_folder=main_folder,
+        ids=ids,
+        texts=texts,
+        labels=labels,
+        img_interval=img_interval
+    )
+
+
+# MMSA_MOSEI 数据集类
+class MMSA_MOSEI(Dataset):
+    def __init__(self, main_folder: str, ids: List[str], texts: List[List[int]], labels: List[int], img_interval: int):
+        super(MMSA_MOSEI, self).__init__()
+        self.ids = ids
+        self.texts = texts
+        self.labels = np.array(labels)
+        self.main_folder = main_folder
+        self.img_interval = img_interval
+        self.crop = transforms.CenterCrop(360)
+
+    # 获得注释
+    def get_annotations(self) -> List[str]:
+        # 积极、消极、中性
+        return ['positive', 'negative', 'neutral']
+
+    # 获得正面的比例
+    def getPosWeight(self):
+        pos_nums = self.labels.sum(axis=0)
+        neg_nums = self.__len__() - pos_nums
+        pos_weight = neg_nums / pos_nums
+        return pos_weight
+
+    # 通过时间间隔切片
+    def sample_imgs_by_interval(self, folder: str, fps: Optional[int] = 30) -> List[str]:
+        files = glob.glob(f'{folder}/*')
+        nums = len(files) - 1
+        step = int(self.img_interval / 1000 * fps)
+        sampled = [os.path.join(folder, f'image_{i}.jpg') for i in list(range(0, nums, step))]
+        if len(sampled) == 0:
+            step = int(self.img_interval / 1000 * fps) // 4
+            sampled = [os.path.join(folder, f'image_{i}.jpg') for i in list(range(0, nums, step))]
+        return sampled
+
+    # 将声波切片
+    def cutSpecToPieces(self, spec, stride=32):
+        # Split the audio waveform by second
+        # 按秒分割音频波形
+        total = -(-spec.size(-1) // stride)
+        specs = []
+        for i in range(total):
+            specs.append(spec[:, :, :, i * stride:(i + 1) * stride])
+
+        # Pad the last piece
+        # 填充最后一片
+        lastPieceLength = specs[-1].size(-1)
+        if lastPieceLength < stride:
+            padRight = stride - lastPieceLength
+            specs[-1] = F.pad(specs[-1], (0, padRight))
+
+        return specs
+
+    def __len__(self):
+        return len(self.ids)
+
+    def __getitem__(self, ind: int) -> Tuple[str, np.array, List[torch.tensor], List[int], np.array]:
+        this_id = self.ids[ind]
+        sample_folder = os.path.join(self.main_folder, this_id)
+
+        sampledImgs = []
+        for imgPath in self.sample_imgs_by_interval(sample_folder):
+            this_img = Image.open(imgPath)
+            H = np.float32(this_img).shape[0]
+            W = np.float32(this_img).shape[1]
+            if H > 360:
+                resize = transforms.Resize([H // 2, W // 2])
+                this_img = resize(this_img)
+            this_img = self.crop(this_img)
+            sampledImgs.append(np.float32(this_img))
+        sampledImgs = np.array(sampledImgs)
+
+        waveform, sr = torchaudio.load(os.path.join(sample_folder, f'audio.wav'))
+
+        # Cut Spec
+        specgram = torchaudio.transforms.MelSpectrogram(
+            sample_rate=sr,
+            win_length=int(float(sr) / 16000 * 400),
+            n_fft=int(float(sr) / 16000 * 400)
+        )(waveform).unsqueeze(0)
+        specgrams = self.cutSpecToPieces(specgram)
+
+        return this_id, sampledImgs, specgrams, self.texts[ind], self.labels[ind]
+
+
+# SIMS中文数据集相关
+# 获取SIMS数据集的方法 （获取训练集、验证集、测试集三者其中一个 phase参数决定）
+def get_dataset_sims(data_folder: str, phase: str, img_interval: int, hand_crafted_features: Optional[bool] = False):
+    # 主文件夹
+    main_folder = os.path.join(data_folder, 'SIMS_RAW_PROCESSED')
+    # 元数据
+    meta = load(os.path.join(main_folder, 'meta.pkl'))
+    # 训练集验证集测试集划分的 所有uttr_id
+    ids = open(os.path.join(data_folder, 'SIMS_SPLIT', f'{phase}_split.txt'), 'r').read().splitlines()
+    # 文本 根据uttr_id中的id取出字符串放入列表
+    texts = [meta[id]['text'] for id in ids]
+    # print(texts)
+    # 标签 根据uttr_id中的id取出对应的多模态标签放入列表
+    labels = [meta[id]['label'] for id in ids]
+    # print(labels)
+
+    # 分支：如果是手工特征
+    if hand_crafted_features:
+        hcf = load(os.path.join(data_folder, 'MOSEI_HCF_FEATURES', f'mosei_senti_hcf_{phase}.pkl'))
+        return MOSEI_baseline(
+            ids=ids,
+            hcf=hcf,
+            labels=labels
+        )
+
+    # 返回一个类的实例 调用类的初始化方法 有5个参数
+    return SIMS(
+        main_folder=main_folder,
+        ids=ids,
+        texts=texts,
+        labels=labels,
+        img_interval=img_interval
+    )
+
+
 # SIMS数据集类
 class SIMS(Dataset):
     def __init__(self, main_folder: str, ids: List[str], texts: List[List[int]], labels: List[int], img_interval: int):
@@ -220,19 +383,19 @@ class SIMS(Dataset):
         self.img_interval = img_interval
         self.crop = transforms.CenterCrop(360)
 
-    #获得注释
+    # 获得注释
     def get_annotations(self) -> List[str]:
-    #生气、沮丧、害怕、开心、伤心、惊讶六种情感
-        return ['anger', 'disgust', 'fear', 'happy', 'sad', 'surprise']
+        #
+        return ['positive', 'neutral', 'negative']
 
-    #获得正面的比例
+    # 获得正面的比例
     def getPosWeight(self):
         pos_nums = self.labels.sum(axis=0)
         neg_nums = self.__len__() - pos_nums
         pos_weight = neg_nums / pos_nums
         return pos_weight
 
-    #通过时间间隔切片
+    # 通过时间间隔切片
     def sample_imgs_by_interval(self, folder: str, fps: Optional[int] = 30) -> List[str]:
         files = glob.glob(f'{folder}/*')
         nums = len(files) - 1
@@ -243,7 +406,7 @@ class SIMS(Dataset):
             sampled = [os.path.join(folder, f'image_{i}.jpg') for i in list(range(0, nums, step))]
         return sampled
 
-    #将声波切片
+    # 将声波切片
     def cutSpecToPieces(self, spec, stride=32):
         # Split the audio waveform by second
         # 按秒分割音频波形
@@ -294,8 +457,9 @@ class SIMS(Dataset):
 
         return this_id, sampledImgs, specgrams, self.texts[ind], self.labels[ind]
 
+
 # MOSEI相关
-#获取mosei数据集的方法 （获取训练集、验证集、测试集三者其中一个 phase参数决定）
+# 获取mosei数据集的方法 （获取训练集、验证集、测试集三者其中一个 phase参数决定）
 def get_dataset_mosei(data_folder: str, phase: str, img_interval: int, hand_crafted_features: Optional[bool] = False):
     # 主文件夹
     main_folder = os.path.join(data_folder, 'MOSEI_RAW_PROCESSED')
@@ -328,7 +492,8 @@ def get_dataset_mosei(data_folder: str, phase: str, img_interval: int, hand_craf
         img_interval=img_interval
     )
 
-#MOSEI数据集的基线模型 也就是使用人工特征进行训练
+
+# MOSEI数据集的基线模型 也就是使用人工特征进行训练
 class MOSEI_baseline(Dataset):
     def __init__(self, ids, hcf, labels: List[int]):
         super(MOSEI_baseline, self).__init__()
@@ -362,7 +527,8 @@ class MOSEI_baseline(Dataset):
 
         return this_id, video_feature, audio_feature, text, label
 
-#mosei数据集人工特征的收集批数据的函数
+
+# mosei数据集人工特征的收集批数据的函数
 def collate_fn_hcf_mosei(batch):
     uttrIds = []
     texts = []
@@ -395,7 +561,8 @@ def collate_fn_hcf_mosei(batch):
         torch.tensor(labels, dtype=torch.float32)
     )
 
-#MOSEI数据集类
+
+# MOSEI数据集类
 class MOSEI(Dataset):
     def __init__(self, main_folder: str, ids: List[str], texts: List[List[int]], labels: List[int], img_interval: int):
         super(MOSEI, self).__init__()
@@ -406,19 +573,19 @@ class MOSEI(Dataset):
         self.img_interval = img_interval
         self.crop = transforms.CenterCrop(360)
 
-    #获得注释
+    # 获得注释
     def get_annotations(self) -> List[str]:
-    #生气、沮丧、害怕、开心、伤心、惊讶六种情感
+        # 生气、沮丧、害怕、开心、伤心、惊讶六种情感
         return ['anger', 'disgust', 'fear', 'happy', 'sad', 'surprise']
 
-    #获得正面的比例
+    # 获得正面的比例
     def getPosWeight(self):
         pos_nums = self.labels.sum(axis=0)
         neg_nums = self.__len__() - pos_nums
         pos_weight = neg_nums / pos_nums
         return pos_weight
 
-    #通过时间间隔切片
+    # 通过时间间隔切片
     def sample_imgs_by_interval(self, folder: str, fps: Optional[int] = 30) -> List[str]:
         files = glob.glob(f'{folder}/*')
         nums = len(files) - 1
@@ -429,7 +596,7 @@ class MOSEI(Dataset):
             sampled = [os.path.join(folder, f'image_{i}.jpg') for i in list(range(0, nums, step))]
         return sampled
 
-    #将声波切片
+    # 将声波切片
     def cutSpecToPieces(self, spec, stride=32):
         # Split the audio waveform by second
         # 按秒分割音频波形
@@ -478,8 +645,9 @@ class MOSEI(Dataset):
 
         return this_id, sampledImgs, specgrams, self.texts[ind], self.labels[ind]
 
+
 # IEMOCAP相关
-#获取iemocap数据集
+# 获取iemocap数据集
 def get_dataset_iemocap(data_folder: str, phase: str, img_interval: int, hand_crafted_features: Optional[bool] = False):
     main_folder = os.path.join(data_folder, 'IEMOCAP_RAW_PROCESSED')
     meta = load(os.path.join(main_folder, 'meta.pkl'))
@@ -521,7 +689,8 @@ def get_dataset_iemocap(data_folder: str, phase: str, img_interval: int, hand_cr
 
     return this_dataset
 
-#IEMOCAP数据集类
+
+# IEMOCAP数据集类
 class IEMOCAP(Dataset):
     def __init__(self, main_folder: str, utterance_ids: List[str], texts: List[List[int]], labels: List[int],
                  label_annotations: List[str], img_interval: int):
@@ -605,7 +774,7 @@ class IEMOCAP(Dataset):
         imgNamePrefix = f'image_{suffix}_'
 
         sampledImgs = np.array([
-            np.float32(Image.open(imgPath)) # .transpose()
+            np.float32(Image.open(imgPath))  # .transpose()
             for imgPath in self.sample_imgs_by_interval(uttrFolder, imgNamePrefix)
         ])
 
@@ -618,14 +787,17 @@ class IEMOCAP(Dataset):
         # Cut Spec 频谱图切片
         # 梅尔频谱图 https://zhuanlan.zhihu.com/p/198900624?utm_source=wechat_session
         # 参考文章 https://vimsky.com/examples/usage/python-torchaudio.transforms.TimeStretch-pt.html
-        specgram = torchaudio.transforms.MelSpectrogram(sample_rate=sr, win_length=int(float(sr) / 16000 * 400))(waveform).unsqueeze(0)
+        specgram = torchaudio.transforms.MelSpectrogram(sample_rate=sr, win_length=int(float(sr) / 16000 * 400))(
+            waveform).unsqueeze(0)
         specgrams = self.cutSpecToPieces(specgram)
 
         return uttrId, sampledImgs, specgrams, self.texts[ind], self.labels[ind]
 
-#IEMOCAP基线模型
+
+# IEMOCAP基线模型
 class IEMOCAP_baseline(Dataset):
-    def __init__(self, utterance_ids, texts, video_features, audio_features, labels, label_annotations, img_interval=500):
+    def __init__(self, utterance_ids, texts, video_features, audio_features, labels, label_annotations,
+                 img_interval=500):
         super(IEMOCAP_baseline, self).__init__()
         self.utterance_ids = utterance_ids
         self.texts_features = texts
@@ -678,5 +850,3 @@ class IEMOCAP_baseline(Dataset):
         label = self.labels[ind]
 
         return uttrId, video_feature, audio_feature, text, label
-
-

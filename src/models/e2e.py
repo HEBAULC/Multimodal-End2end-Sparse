@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from src.models.e2e_t import MME2E_T
+import torch.nn.functional as F
 from src.models.e2e_t_zh import MME2E_T_ZH
 
 from src.models.transformer_encoder import WrappedTransformerEncoder
@@ -94,6 +95,7 @@ class MME2E(nn.Module):
 
         # 对视觉模态特征进行线性变换+非线性变换 变换到transformer的输入维度
         self.v_flatten = nn.Sequential(
+            # nn.Dropout(p=0.2), # added
             nn.Linear(512 * 3 * 3, 1024),
             nn.ReLU(),
             nn.Linear(1024, trans_dim)
@@ -101,6 +103,7 @@ class MME2E(nn.Module):
 
         # 对音频模态特征进行线性变换+非线性变换 变换到transformer的输入维度 default=512
         self.a_flatten = nn.Sequential(
+            # nn.Dropout(p=0.2), # added
             nn.Linear(512 * 8 * 2, 1024),
             nn.ReLU(),
             nn.Linear(1024, trans_dim)
@@ -116,6 +119,8 @@ class MME2E(nn.Module):
         self.t_out = nn.Linear(text_cls_dim, self.num_classes)
         # 对音频的的FFN 全连接层 trans_dim->num_classes
         self.a_out = nn.Linear(trans_dim, self.num_classes)
+        # 原来没有drop
+        self.drop = nn.Dropout(p=0.2)
         # 加权融合 默认情况下 3->1
         self.weighted_fusion = nn.Linear(len(self.mod), 1, bias=False)
 
@@ -126,7 +131,11 @@ class MME2E(nn.Module):
         if 't' in self.mod:
             text_cls = self.T(text, get_cls=True)
             # FFN text_feature(768)将仿射变幻后的feature_dim(256)维度映射为num_classes个输出
+            ## dropout 原来没有
+            # text_cls = self.drop(text_cls)
             text_cls = self.t_out(text_cls)
+            ## 激活函数 原来没有
+            # text_cls = F.relu(text_cls)
             # print('text_cls', text_cls)
             '''
             text_cls tensor([[-0.6526,  0.1766, -0.0253,  0.1428,  0.1186,  0.0980],
@@ -170,7 +179,11 @@ class MME2E(nn.Module):
             # 特征送入
             faces = self.v_transformer(faces, imgs_lens, get_cls=True)
             # FFN 将transformer Encoder的输出维度映射为num_classes个输出
+            ## dropout 原来没有
+            # faces = self.drop(faces)
             faces = self.v_out(faces)
+            ## 激活函数 原来没有
+            # faces = F.relu(faces)
             # print('faces.size()', faces.size()) # torch.Size([8, 6])
             # print(faces)
             '''
@@ -214,7 +227,11 @@ class MME2E(nn.Module):
             specs = self.a_flatten(specs.flatten(start_dim=1))
             specs = self.a_transformer(specs, spec_lens, get_cls=True)
             # FFN 将transformer Encoder的输出维度映射为num_classes个输出
+            ## dropout 原来没有
+            # specs = self.drop(specs)
             specs = self.a_out(specs)
+            ## 激活函数 原来没有
+            # specs = F.relu(specs)
             # print('specs.size()', specs.size()) # torch.Size([8, 6])
             # print(specs)
             '''
@@ -318,8 +335,13 @@ class MME2E(nn.Module):
                  [ 1.3392e-01, -3.7255e+00, -1.9009e-01],
                  [ 9.5392e-02,  3.2427e-01, -3.4887e+00]]], device='cuda:0')
         '''
+        # 六种分类
         # self.weighted_fusion(stack) [8, 6 ,3]->[8, 6 ,1]
         # .squeeze(-1) [8, 6 ,1]->[8, 6]
+
+        # 回归
+        # self.weighted_fusion(stack) [8, 1 ,3]->[8, 1 ,1]
+        # .squeeze(-1) [8, 1 ,1]->[8, 1]
         return self.weighted_fusion(stack).squeeze(-1)
 
     # 图像中心裁剪

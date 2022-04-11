@@ -97,7 +97,8 @@ class SimsTrainer(TrainerBase):
                     ['Test', *test_stats_str]
                 ], headers=self.header))
                 # if valid_stats[3] > self.best_valid_stats[3]:
-                if valid_stats[4] < self.best_valid_stats[4]:
+                # if valid_stats[4] < self.best_valid_stats[4]: # MAE小
+                if valid_stats[0] > self.best_valid_stats[0]: # acc2大
                     # print('valid_stats', valid_stats)
                     # print('best_valid_stats', self.best_valid_stats)
                     #
@@ -176,8 +177,10 @@ class SimsTrainer(TrainerBase):
 
     def train_one_epoch(self):
         self.model.train()
-        if self.args['model'] == 'mme2e' or self.args['model'] == 'mme2e_sparse':
-            self.model.mtcnn.eval()
+
+        # 原来在训练时mtcnn没有进行梯度更新
+        # if self.args['model'] == 'mme2e' or self.args['model'] == 'mme2e_sparse':
+        #     self.model.mtcnn.eval()
 
         dataloader = self.dataloaders['train']
         epoch_loss = 0.0
